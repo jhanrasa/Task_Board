@@ -61,3 +61,7 @@ CREATE TABLE CARDS_BLOCKS (
     unblock_reason VARCHAR(255) NULL,
     FOREIGN KEY (card_id) REFERENCES CARDS(id) ON DELETE CASCADE
 );
+
+
+
+## Desenvolvido por Jean Domiciano de Menezes como parte dos estudos de java
