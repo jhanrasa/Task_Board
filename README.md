@@ -6,7 +6,7 @@
 
 Este é um sistema de gerenciamento de tarefas via linha de comando (CLI) desenvolvido em **Java**, utilizando **JDBC** para persistência de dados no **MySQL**. O projeto segue uma arquitetura em camadas (DTO, DAO, Service e UI).
 
-![Visão Detalhada do Sistema](screenshots/.png)
+![Visão Detalhada do Sistema](screenshots/Captura%20de%20tela%202026-03-12%20165734.png.)
 
 ## 🚀 Funcionalidades
 
