@@ -1,0 +1,37 @@
+package org.example.service;
+
+import org.example.dto.BoardDTO;
+import org.example.persistence.BoardDAO;
+import java.sql.SQLException;
+import java.util.List;
+
+public class BoardService {
+    private final BoardDAO boardDAO = new BoardDAO();
+
+    public void createNewBoard(String name) {
+
+        if (name == null || name.isBlank()) {
+            throw new IllegalArgumentException("O nome do board é obrigatório!");
+        }
+
+        BoardDTO board = BoardDTO.builder().name(name).build();
+        try {
+            boardDAO.insert(board);
+            System.out.println("Board '" + name + "' criado com sucesso!");
+        } catch (SQLException e) {
+            System.err.println("Erro ao salvar no banco: " + e.getMessage());
+        }
+    }
+    public List<BoardDTO> listAll() throws SQLException {
+        return boardDAO.listAll();
+    }
+    public void deleteBoard(Long boardId) throws SQLException {
+
+        boardDAO.delete(boardId);
+    }
+
+    public List<BoardDTO> listAllFull() throws SQLException {
+        List<BoardDTO> boards = boardDAO.findAllFull();
+        return boards;
+    }
+}
