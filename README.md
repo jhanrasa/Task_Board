@@ -1,8 +1,12 @@
 # Task_Board
 
+## Desenvolvido por Jean Domiciano de Mnezes como parte dos estudos sobre java
+
 # 📋 Gerenciador de Boards (Kanban CLI)
 
 Este é um sistema de gerenciamento de tarefas via linha de comando (CLI) desenvolvido em **Java**, utilizando **JDBC** para persistência de dados no **MySQL**. O projeto segue uma arquitetura em camadas (DTO, DAO, Service e UI).
+
+![Visão Detalhada do Sistema](screenshots/.png)
 
 ## 🚀 Funcionalidades
 
@@ -62,6 +66,3 @@ CREATE TABLE CARDS_BLOCKS (
     FOREIGN KEY (card_id) REFERENCES CARDS(id) ON DELETE CASCADE
 );
 
-
-
-## Desenvolvido por Jean Domiciano de Menezes como parte dos estudos de java
