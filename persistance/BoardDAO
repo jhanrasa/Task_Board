@@ -1,0 +1,123 @@
+package org.example.persistence;
+
+import org.example.config.ConnectionFactory;
+import org.example.dto.BoardColumnDTO;
+import org.example.dto.BoardDTO;
+import org.example.dto.CardDTO;
+import org.example.dto.ColumnKind;
+
+import java.sql.*;
+import java.util.ArrayList;
+import java.util.List;
+
+public class BoardDAO {
+    private static final String INSERT_SQL = "INSERT INTO BOARDS (name) VALUES (?)";
+    private static final String SELECT_ALL_SQL = "SELECT * FROM BOARDS";
+
+    public void insert(BoardDTO board) throws SQLException {
+        String sql = "INSERT INTO BOARDS (name) VALUES (?)";
+        try (Connection conn = ConnectionFactory.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+
+            stmt.setString(1, board.getName());
+            stmt.executeUpdate();
+
+            var rs = stmt.getGeneratedKeys();
+            if (rs.next()) board.setId(rs.getLong(1));
+        }
+    }
+    public BoardColumnDTO findColumnByKind(Long boardId, ColumnKind kind) throws SQLException {
+        String sql = "SELECT id, name FROM BOARDS_COLUMNS WHERE board_id = ? AND kind = ?";
+        try (Connection conn = ConnectionFactory.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setLong(1, boardId);
+            stmt.setString(2, kind.name());
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return BoardColumnDTO.builder()
+                            .id(rs.getLong("id"))
+                            .name(rs.getString("name"))
+                            .build();
+                }
+            }
+        }
+        throw new RuntimeException("Coluna do tipo " + kind + " não encontrada para este board!");
+    }
+    public List<BoardDTO> listAll() throws SQLException {
+        List<BoardDTO> boards = new ArrayList<>();
+        String sql = "SELECT id, name FROM BOARDS";
+        try (Connection conn = ConnectionFactory.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql);
+             ResultSet rs = stmt.executeQuery()) {
+            while (rs.next()) {
+                boards.add(BoardDTO.builder()
+                        .id(rs.getLong("id"))
+                        .name(rs.getString("name"))
+                        .build());
+            }
+        }
+        return boards;
+    }
+    public void delete(Long boardId) throws SQLException {
+        String sql = "DELETE FROM BOARDS WHERE id = ?";
+        try (Connection conn = ConnectionFactory.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setLong(1, boardId);
+            int rowsAffected = stmt.executeUpdate();
+
+            if (rowsAffected > 0) {
+                System.out.println("Board removido com sucesso no banco de dados.");
+            } else {
+                System.out.println("Nenhum board encontrado com o ID informado.");
+            }
+        }
+    }
+
+    //The "brain" of visualization. Uses a LEFT JOIN and subqueries to bring in Boards, Cards, and Block Reasons in a single trip to the bank.
+    public List<BoardDTO> findAllFull() throws SQLException {
+        List<BoardDTO> boards = new ArrayList<>();
+        String sql = "SELECT b.id as board_id, b.name as board_name, " +
+                "c.id as card_id, c.title, c.description as desc_card, c.created_at, " +
+                "(SELECT reason FROM CARDS_BLOCKS WHERE card_id = c.id AND unblocked_at IS NULL LIMIT 1) as block_reason, " +
+                "(SELECT unblock_reason FROM CARDS_BLOCKS WHERE card_id = c.id AND unblocked_at IS NOT NULL ORDER BY unblocked_at DESC LIMIT 1) as last_unblock_reason " +
+                "FROM BOARDS b " +
+                "LEFT JOIN BOARDS_COLUMNS bc ON b.id = bc.board_id " +
+                "LEFT JOIN CARDS c ON bc.id = c.board_column_id AND bc.kind <> 'FINAL' " +
+                "ORDER BY b.id, bc.column_order";
+
+        try (Connection conn = ConnectionFactory.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql);
+             ResultSet rs = stmt.executeQuery()) {
+
+            BoardDTO currentBoard = null;
+            while (rs.next()) {
+                Long boardId = rs.getLong("board_id");
+
+                if (currentBoard == null || !currentBoard.getId().equals(boardId)) {
+                    currentBoard = BoardDTO.builder()
+                            .id(boardId)
+                            .name(rs.getString("board_name"))
+                            .columns(new ArrayList<>())
+                            .cards(new ArrayList<>())
+                            .build();
+                    boards.add(currentBoard);
+                }
+
+                if (rs.getLong("card_id") != 0) {
+                    CardDTO card = CardDTO.builder()
+                            .id(rs.getLong("card_id"))
+                            .title(rs.getString("title"))
+                            .description(rs.getString("desc_card"))
+                            .blockReason(rs.getString("block_reason"))
+                            .unblockReason(rs.getString("last_unblock_reason"))
+                            .createdAt(rs.getTimestamp("created_at").toLocalDateTime().atOffset(java.time.ZoneOffset.UTC))
+                            .build();
+
+                    currentBoard.getCards().add(card);
+                }
+            }
+        }
+        return boards;
+    }
+
+}
