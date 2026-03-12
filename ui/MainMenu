@@ -1,0 +1,264 @@
+package org.example.ui;
+
+import org.example.dto.BoardColumnDTO;
+import org.example.dto.BoardDTO;
+import org.example.dto.CardDTO;
+import org.example.dto.ColumnKind;
+import org.example.service.BoardService;
+import org.example.service.CardService;
+
+import java.sql.SQLException;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
+import java.util.Scanner;
+
+public class MainMenu {
+    private final BoardService boardService = new BoardService();
+    private final Scanner scanner = new Scanner(System.in);
+    private final CardService cardService = new CardService();
+
+    //The main loop that keeps the program running until you type "0".
+    public void execute() {
+        int option = -1;
+        while (option != 0) {
+            showMenu();
+            try {
+                option = Integer.parseInt(scanner.nextLine());
+                switch (option) {
+                    case 1 -> createBoard();
+                    case 2 -> createCard();
+                    case 3 -> completeTaskFlow();
+                    case 4 -> listCards();
+                    case 5 -> deleteBoardFlow();
+                    case 6 -> showFullBoardView();
+                    case 7 -> blockCardFlow();
+                    case 8 -> unblockCardFlow();
+                    case 9 -> moveCardFlow();
+                    case 0 -> System.out.println("Saindo...");
+                    default -> System.out.println("Opção inválida!");
+                }
+            } catch (Exception e) {
+                System.err.println("Ocorreu um erro: " + e.getMessage());
+            }
+        }
+    }
+
+    private void listCards() {
+        try {
+            List<CardDTO> cards = cardService.listAllCards();
+            DateTimeFormatter fmt = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
+
+            System.out.println("\n--- QUADRO DE TAREFAS ---");
+            for (CardDTO card : cards) {
+                String dataStr = card.getCreatedAt().format(fmt);
+                System.out.printf("[%s] ID: %d | %s\n", dataStr, card.getId(), card.getTitle());
+            }
+        } catch (SQLException e) {
+            System.err.println("Erro: " + e.getMessage());
+        }
+    }
+
+    private void createBoard() {
+        System.out.print("Digite o nome do novo board: ");
+        String name = scanner.nextLine();
+        boardService.createNewBoard(name);
+    }
+
+    private void showMenu() {
+        System.out.println("\n=== GERENCIADOR DE TAREFAS ===");
+        System.out.println("1. Criar novo board");
+        System.out.println("2. Criar novo card");
+        System.out.println("3. Selecionar Board (Concluir Tarefas)");
+        System.out.println("4. Listar todos os cards");
+        System.out.println("5. Deletar um board");
+        System.out.println("6. Exibir Tarefas");
+        System.out.println("7. Bloquear card");
+        System.out.println("8. Desbloquear card");
+        System.out.println("9. Mover um card para a próxima coluna");
+        System.out.println("0. Sair");
+        System.out.print("Escolha: ");
+    }
+
+    private void createCard() {
+        try {
+
+            var boards = boardService.listAll();
+            if (boards.isEmpty()) {
+                System.out.println("Crie um board antes de adicionar cards!");
+                return;
+            }
+
+            System.out.println("\n--- SELECIONE O BOARD ---");
+            boards.forEach(b -> System.out.printf("[%d] %s\n", b.getId(), b.getName()));
+            System.out.print("ID do Board: ");
+            Long boardId = Long.parseLong(scanner.nextLine());
+
+
+            System.out.print("Título do card: ");
+            String title = scanner.nextLine();
+            System.out.print("Descrição: ");
+            String description = scanner.nextLine();
+
+
+            BoardColumnDTO initialColumn = BoardColumnDTO.builder()
+                    .kind(ColumnKind.INITIAL)
+                    .build();
+
+            CardDTO card = CardDTO.builder()
+                    .title(title)
+                    .description(description)
+                    .boardId(boardId)
+                    .currentColumn(initialColumn)
+                    .build();
+
+            cardService.createCard(card);
+            System.out.println("Card criado com sucesso!");
+
+        } catch (SQLException e) {
+            System.err.println("Erro no banco: " + e.getMessage());
+        } catch (NumberFormatException e) {
+            System.out.println("ID inválido selecionado.");
+        }
+    }
+
+    private void blockCardFlow() {
+        try {
+            System.out.println("\n--- BLOQUEAR TAREFA ---");
+            System.out.print("Digite o ID do card: ");
+            Long cardId = Long.parseLong(scanner.nextLine());
+
+            System.out.print("Motivo do bloqueio: ");
+            String reason = scanner.nextLine();
+
+            cardService.blockCard(cardId, reason);
+            System.out.println("Card #" + cardId + " bloqueado com sucesso!");
+        } catch (SQLException e) {
+            System.err.println("Erro no banco de dados: " + e.getMessage());
+        } catch (Exception e) {
+            System.err.println("Erro: " + e.getMessage());
+        }
+    }
+
+    private void completeTaskFlow() {
+        try {
+
+            var boards = boardService.listAll();
+            if (boards.isEmpty()) {
+                System.out.println("Nenhum board disponível.");
+                return;
+            }
+            boards.forEach(b -> System.out.printf("[%d] %s\n", b.getId(), b.getName()));
+            System.out.print("Escolha o ID do Board: ");
+            Long boardId = Long.parseLong(scanner.nextLine());
+
+
+            var cards = cardService.listCardsByBoardId(boardId);
+            if (cards.isEmpty()) {
+                System.out.println("Não há cards ativos para este board.");
+                return;
+            }
+            cards.forEach(c -> System.out.printf("[%d] %s\n", c.getId(), c.getTitle()));
+            System.out.print("Escolha o ID do Card para concluir: ");
+            Long cardId = Long.parseLong(scanner.nextLine());
+
+
+            cardService.finishCard(cardId);
+            System.out.println("Tarefa movida para a coluna FINAL!");
+
+        } catch (SQLException e) {
+            System.err.println("Erro no banco: " + e.getMessage());
+        } catch (NumberFormatException e) {
+            System.out.println("Entrada inválida.");
+        }
+    }
+    private void deleteBoardFlow() {
+        try {
+            var boards = boardService.listAll();
+            if (boards.isEmpty()) {
+                System.out.println("Não há boards para remover.");
+                return;
+            }
+
+            System.out.println("\n--- REMOVER BOARD ---");
+            boards.forEach(b -> System.out.printf("[%d] %s\n", b.getId(), b.getName()));
+            System.out.print("Digite o ID do Board que deseja REMOVER (CUIDADO: isso apagará todos os cards dele!): ");
+            Long boardId = Long.parseLong(scanner.nextLine());
+
+            System.out.print("Tem certeza que deseja excluir? (S/N): ");
+            String confirm = scanner.nextLine();
+
+            if (confirm.equalsIgnoreCase("S")) {
+                boardService.deleteBoard(boardId);
+                System.out.println("Operação realizada.");
+            } else {
+                System.out.println("Exclusão cancelada.");
+            }
+
+        } catch (SQLException e) {
+            System.err.println("Erro ao remover board: " + e.getMessage());
+        } catch (NumberFormatException e) {
+            System.out.println("ID inválido.");
+        }
+    }
+
+    //Scrolls through the list of boards and cards, formatting the text with ANSI colors to visually indicate what's active or locked.
+    private void showFullBoardView() {
+        try {
+            List<BoardDTO> boards = boardService.listAllFull();
+            System.out.println("\n========== VISÃO DETALHADA DOS PROJETOS ==========");
+
+            for (BoardDTO board : boards) {
+                System.out.printf("\n[BOARD #%d] %s\n", board.getId(), board.getName().toUpperCase());
+
+                for (CardDTO card : board.getCards()) {
+
+                    boolean isBlocked = card.getBlockReason() != null;
+
+                    String status = isBlocked ? "\u001B[31m [BLOQUEADO] \u001B[0m": "\u001B[32m [ATIVO] \u001B[0m";
+
+                    System.out.printf("  ├── ID: %d | %s%s\n", card.getId(), card.getTitle(), status);
+                    System.out.printf("  │   Descrição: %s\n", card.getDescription());
+
+                    if (isBlocked) {
+
+                        System.out.println("  │   MOTIVO BLOQUEIO: " + card.getBlockReason());
+                    }
+                    System.out.println("  │   Última SOLUÇÃO: " + card.getUnblockReason());
+                }
+                System.out.println("  ------------------------------------------------");
+            }
+        } catch (Exception e) {
+            System.err.println("Erro na visão detalhada: " + e.getMessage());
+        }
+    }
+
+    private void unblockCardFlow() {
+        try {
+            System.out.println("\n--- DESBLOQUEAR TAREFA ---");
+            System.out.print("Digite o ID do card: ");
+            Long cardId = Long.parseLong(scanner.nextLine());
+
+            System.out.print("Como o problema foi resolvido? ");
+            String reason = scanner.nextLine();
+
+            cardService.unblockCard(cardId, reason);
+        } catch (SQLException e) {
+            System.err.println("Erro no banco: " + e.getMessage());
+        } catch (Exception e) {
+            System.err.println("Erro: " + e.getMessage());
+        }
+    }
+
+    private void moveCardFlow() {
+        try {
+            System.out.println("\n--- MOVER TAREFA PARA PRÓXIMA ETAPA ---");
+            System.out.print("Digite o ID do card que deseja mover: ");
+            Long cardId = Long.parseLong(scanner.nextLine());
+
+            cardService.moveCardToNextColumn(cardId);
+            System.out.println("Card movido com sucesso!");
+        } catch (Exception e) {
+            System.err.println("Erro ao mover: " + e.getMessage());
+        }
+    }
+}
